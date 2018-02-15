@@ -6,7 +6,7 @@ import AddCount from '../components/AddCount'
 export default connect(state => state)(({ title, linkTo, lastUpdate, light }) => {
   return (
     <div>
-      <h1>Header</h1>
+      <h1>{title}</h1>
       Light: {light.toString()}
     </div>
   )

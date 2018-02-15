@@ -1,13 +1,19 @@
 import React from 'react'
 import { startClock, addCount, serverRenderClock } from '../store'
 
-import applyLayout from '../modules/next-layouts'
 import AppLayout from '../layouts/AppLayout'
 
 import Page from '../components/Page'
+import withStore from '../store'
 
 class Counter extends React.Component {
-  static layout = AppLayout
+  static renderPage = ({Component, ...props}) => {
+    return (
+      <AppLayout title="OTHER PAGE">
+        <Component {...props} />
+      </AppLayout>
+    )
+  }
 
   static getInitialProps ({ store, isServer }) {
     store.dispatch(serverRenderClock(isServer))
@@ -31,4 +37,4 @@ class Counter extends React.Component {
   }
 }
 
-export default applyLayout(Counter);
+export default withStore(Counter);

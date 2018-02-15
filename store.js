@@ -1,4 +1,5 @@
-import { createStore, applyMiddleware } from 'redux'
+import withRedux from 'next-redux-wrapper'
+import { bindActionCreators, createStore, applyMiddleware } from 'redux'
 import { composeWithDevTools } from 'redux-devtools-extension'
 import thunkMiddleware from 'redux-thunk'
 
@@ -41,4 +42,88 @@ export const addCount = () => dispatch => {
 
 export const initStore = (initialState = exampleInitialState) => {
   return createStore(reducer, initialState, composeWithDevTools(applyMiddleware(thunkMiddleware)))
+}
+
+
+const mapDispatchToProps = (dispatch) => {
+  return {
+    addCount: bindActionCreators(addCount, dispatch),
+    startClock: bindActionCreators(startClock, dispatch)
+  }
+}
+
+
+import React from 'react'
+import { Provider } from 'react-redux'
+
+export default function withStore(Component) {
+  const ComponentWithStore = withRedux(initStore, null, mapDispatchToProps)(Component)
+
+  // Handle renderPage API
+  // =====================
+  //
+  const _renderPage = Component.renderPage
+  if (typeof _renderPage === 'function') {
+    /// COPY FROM Next-Redux-Wrapper as it is not exposed as public API
+    function nextReduxWrapperInitStore(makeStore, initialState, context, config) {
+        var isBrowser = typeof window !== 'undefined';
+        var req = context.req;
+        var isServer = !!req && !isBrowser;
+        var storeKey = config.storeKey;
+
+        var options = Object.assign({}, config, {
+            isServer: isServer,
+            req: req,
+            res: context.res,
+            query: context.query
+        });
+
+        // Always make a new store if server
+        if (isServer) {
+            if (!req._store) {
+                req._store = makeStore(initialState, options);
+            }
+            return req._store;
+        }
+        if (!isBrowser) return null;
+
+        // Memoize store if client
+        if (!window[storeKey]) {
+            window[storeKey] = makeStore(initialState, options);
+        }
+
+        return window[storeKey];
+
+    }
+    /// END OF COPY
+
+
+    // NOTE: This was adopted from Next-Redux-Wrapper render() implementation
+    const config = {storeKey: '__NEXT_REDUX_STORE__', debug: false}
+    const createStore = initStore // XXX map the global variable to the expected local name (to match the copied implementation)
+    ComponentWithStore.renderPage = function(ctx) {
+      const props = ctx.props || {};
+
+      const initialState = props.initialState || {};
+      const initialProps = props.initialProps || {};
+      const hasStore = props.store && props.store.dispatch && props.store.getState;
+      const store = hasStore
+            ? props.store
+            : nextReduxWrapperInitStore(createStore, initialState, {}, config); // client case, no store but has initialState
+
+      if (!store) {
+        console.error('Attention, withRedux has to be used only for top level pages, all other components must be wrapped with React Redux connect!');
+        console.error('Check ' + Component.name + ' component.');
+        return null;
+      }
+
+      return React.createElement( //FIXME This will create double Provider for _document case
+        Provider,
+        {store: store},
+        _renderPage(ctx)
+      );
+    }
+  }
+
+  return ComponentWithStore
 }
